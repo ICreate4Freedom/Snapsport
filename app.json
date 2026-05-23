@@ -12,7 +12,14 @@
       "infoPlist": {
         "NSPhotoLibraryAddUsageDescription": "SnapsPort saves your Snapchat memories directly to your photo library.",
         "NSPhotoLibraryUsageDescription": "SnapsPort saves your Snapchat memories directly to your photo library.",
-        "LSApplicationQueriesSchemes": ["snapchat"],
+        "LSApplicationQueriesSchemes": [
+          "snapchat",
+          "googlegmail",
+          "ms-outlook",
+          "ymail",
+          "readdle-spark",
+          "protonmail"
+        ],
         "CFBundleDocumentTypes": [
           {
             "CFBundleTypeName": "ZIP Archive",

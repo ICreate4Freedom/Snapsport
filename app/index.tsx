@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import * as Linking from 'expo-linking';
 import React, { useEffect, useRef } from 'react';
 import {
+  ActionSheetIOS,
   Animated,
   SafeAreaView,
   ScrollView,
@@ -11,25 +12,46 @@ import {
   View,
 } from 'react-native';
 
-// Email app deep links — tried in order until one opens
 const EMAIL_APPS = [
-  { label: 'Gmail', scheme: 'googlegmail://' },
-  { label: 'Outlook', scheme: 'ms-outlook://' },
-  { label: 'Mail', scheme: 'message://' },
-  { label: 'Mail', scheme: 'mailto:' },
+  { label: 'Gmail',      scheme: 'googlegmail://' },
+  { label: 'Outlook',    scheme: 'ms-outlook://'  },
+  { label: 'Yahoo Mail', scheme: 'ymail://'        },
+  { label: 'Spark',      scheme: 'readdle-spark://' },
+  { label: 'ProtonMail', scheme: 'protonmail://'   },
+  { label: 'Apple Mail', scheme: 'mailto:'         },
 ];
 
 async function openEmailApp() {
+  const available: typeof EMAIL_APPS = [];
   for (const app of EMAIL_APPS) {
     try {
-      const supported = await Linking.canOpenURL(app.scheme);
-      if (supported) {
-        await Linking.openURL(app.scheme);
-        return;
-      }
+      if (await Linking.canOpenURL(app.scheme)) available.push(app);
     } catch {}
   }
-  await Linking.openURL('mailto:');
+
+  if (available.length === 0) {
+    // No email app installed — fall back to Gmail on the web
+    await Linking.openURL('https://mail.google.com');
+    return;
+  }
+
+  if (available.length === 1) {
+    await Linking.openURL(available[0].scheme);
+    return;
+  }
+
+  ActionSheetIOS.showActionSheetWithOptions(
+    {
+      title: 'Open email app',
+      options: [...available.map((a) => a.label), 'Cancel'],
+      cancelButtonIndex: available.length,
+    },
+    (index) => {
+      if (index < available.length) {
+        Linking.openURL(available[index].scheme);
+      }
+    }
+  );
 }
 
 async function openSnapchat() {
