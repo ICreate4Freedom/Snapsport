@@ -1,10 +1,9 @@
 import { router } from 'expo-router';
 import * as Linking from 'expo-linking';
 import React, { useEffect, useRef } from 'react';
-import { generateMockMemories } from '../src/data/mockMemories';
-import { useStore } from '../src/store/useStore';
 import {
   ActionSheetIOS,
+  Alert,
   Animated,
   SafeAreaView,
   ScrollView,
@@ -13,6 +12,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { generateMockMemories } from '../src/data/mockMemories';
+import { useStore } from '../src/store/useStore';
 
 const EMAIL_APPS = [
   { label: 'Gmail',      scheme: 'googlegmail://' },
@@ -170,7 +171,7 @@ function StepCard({ step, delay }: { step: Step; delay: number }) {
 
 export default function OnboardingScreen() {
   const headerAnim = useRef(new Animated.Value(0)).current;
-  const { setMemories, setDebugMode } = useStore();
+  const { setMemories, setDebugMode, setProgress } = useStore();
 
   useEffect(() => {
     Animated.timing(headerAnim, {
@@ -180,10 +181,28 @@ export default function OnboardingScreen() {
     }).start();
   }, []);
 
-  function handleDebugMode() {
+  function handleDebugProcessing() {
     setDebugMode(true);
     setMemories(generateMockMemories());
     router.push({ pathname: '/processing', params: { skipped: '3' } });
+  }
+
+  function handleDebugComplete(withFailures: boolean) {
+    setDebugMode(true);
+    if (withFailures) {
+      setProgress({ total: 75, saved: 68, failed: 7, active: 0 });
+    } else {
+      setProgress({ total: 75, saved: 75, failed: 0, active: 0 });
+    }
+    router.push('/complete');
+  }
+
+  function handleDebugImportError() {
+    Alert.alert(
+      'Import failed',
+      'Could not find memories_history.json in the ZIP.\n\nMake sure you selected both "Export your Memories" and "Export JSON Files" in Snapchat → My Data.',
+      [{ text: 'OK' }]
+    );
   }
 
   return (
@@ -225,9 +244,21 @@ export default function OnboardingScreen() {
         </View>
 
         {__DEV__ && (
-          <TouchableOpacity style={styles.debugBtn} onPress={handleDebugMode} activeOpacity={0.7}>
-            <Text style={styles.debugBtnText}>⚙️  Debug Mode — skip to processing</Text>
-          </TouchableOpacity>
+          <View style={styles.debugPanel}>
+            <Text style={styles.debugLabel}>⚙️  Debug shortcuts</Text>
+            <TouchableOpacity style={styles.debugBtn} onPress={handleDebugProcessing} activeOpacity={0.7}>
+              <Text style={styles.debugBtnText}>Processing (paywall + download)</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.debugBtn} onPress={() => handleDebugComplete(false)} activeOpacity={0.7}>
+              <Text style={styles.debugBtnText}>Complete — all done 🎉</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.debugBtn} onPress={() => handleDebugComplete(true)} activeOpacity={0.7}>
+              <Text style={styles.debugBtnText}>Complete — with failures ⚠️</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.debugBtn} onPress={handleDebugImportError} activeOpacity={0.7}>
+              <Text style={styles.debugBtnText}>Import error alert</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -325,12 +356,20 @@ const styles = StyleSheet.create({
   privacyTitle: { color: '#4caf50', fontWeight: '700', fontSize: 13, marginBottom: 4 },
   privacyText: { color: '#4a7a4a', fontSize: 12, lineHeight: 17 },
 
-  debugBtn: {
+  debugPanel: {
     marginTop: 24,
-    borderColor: '#333',
+    borderColor: '#222',
     borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 12,
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  debugLabel: { color: '#444', fontSize: 11, fontWeight: '600', marginBottom: 4 },
+  debugBtn: {
+    borderColor: '#2a2a2a',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 10,
     alignItems: 'center',
   },
   debugBtnText: { color: '#555', fontSize: 13 },

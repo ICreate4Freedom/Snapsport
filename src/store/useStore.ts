@@ -36,6 +36,7 @@ interface AppState {
   setExportDestination: (dest: ExportDestination) => void;
   setPurchased: (v: boolean) => void;
   setDebugMode: (v: boolean) => void;
+  setProgress: (progress: DownloadProgress) => void;
   reset: () => void;
 }
 
@@ -85,6 +86,8 @@ export const useStore = create<AppState>((set, get) => ({
   setPurchased: (isPurchased) => set({ isPurchased }),
 
   setDebugMode: (debugMode) => set({ debugMode }),
+
+  setProgress: (progress) => set({ progress }),
 
   reset: () =>
     set({
