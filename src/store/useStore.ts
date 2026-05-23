@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { MemoryItem } from '../core/parser';
 import { DownloadJob, DownloadProgress } from '../core/downloader';
 
+export const FREE_TIER_LIMIT = 50;
+
 export type AppPhase =
   | 'onboarding'
   | 'importing'
@@ -22,6 +24,8 @@ interface AppState {
   cancelSignal: { cancelled: boolean };
   pendingFileUri: string | null;
   exportDestination: ExportDestination;
+  isPurchased: boolean;
+  debugMode: boolean;
 
   setPhase: (phase: AppPhase) => void;
   setMemories: (memories: MemoryItem[]) => void;
@@ -30,6 +34,8 @@ interface AppState {
   cancelDownload: () => void;
   setPendingFileUri: (uri: string | null) => void;
   setExportDestination: (dest: ExportDestination) => void;
+  setPurchased: (v: boolean) => void;
+  setDebugMode: (v: boolean) => void;
   reset: () => void;
 }
 
@@ -44,11 +50,12 @@ export const useStore = create<AppState>((set, get) => ({
   cancelSignal: { cancelled: false },
   pendingFileUri: null,
   exportDestination: 'album',
+  isPurchased: false,
+  debugMode: false,
 
   setPhase: (phase) => set({ phase }),
 
   setMemories: (memories) => {
-    // V1: $0.99 paid upfront — no tier limit, everyone gets full access
     const jobs: DownloadJob[] = memories.map((memory, index) => ({
       memory,
       index,
@@ -75,6 +82,10 @@ export const useStore = create<AppState>((set, get) => ({
 
   setExportDestination: (exportDestination) => set({ exportDestination }),
 
+  setPurchased: (isPurchased) => set({ isPurchased }),
+
+  setDebugMode: (debugMode) => set({ debugMode }),
+
   reset: () =>
     set({
       phase: 'onboarding',
@@ -84,5 +95,7 @@ export const useStore = create<AppState>((set, get) => ({
       error: null,
       cancelSignal: { cancelled: false },
       pendingFileUri: null,
+      debugMode: false,
+      // isPurchased intentionally NOT reset — RevenueCat re-checks on startup
     }),
 }));

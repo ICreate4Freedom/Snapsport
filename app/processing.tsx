@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   SafeAreaView,
   StyleSheet,
@@ -10,7 +11,9 @@ import {
 } from 'react-native';
 import { ProgressBar } from '../src/components/ProgressBar';
 import { runDownloadQueue } from '../src/core/downloader';
-import { useStore, ExportDestination } from '../src/store/useStore';
+import { runDebugQueue } from '../src/core/debugQueue';
+import { purchaseUnlock, restoreUnlock } from '../src/core/revenuecat';
+import { useStore, FREE_TIER_LIMIT, ExportDestination } from '../src/store/useStore';
 
 export default function ProcessingScreen() {
   const { skipped } = useLocalSearchParams<{ skipped?: string }>();
@@ -23,35 +26,86 @@ export default function ProcessingScreen() {
     cancelDownload,
     exportDestination,
     setExportDestination,
+    isPurchased,
+    setPurchased,
+    debugMode,
   } = useStore();
 
-  const [hasStarted, setHasStarted] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
   const startedRef = useRef(false);
 
-  const total = jobs.length;
   const allMemoriesCount = memories.length;
   const skippedCount = parseInt(skipped ?? '0', 10);
-  const progressRatio = progress.total > 0 ? (progress.saved + progress.failed) / progress.total : 0;
+  const needsPaywall = allMemoriesCount > FREE_TIER_LIMIT && !isPurchased;
+  const downloadJobs = needsPaywall ? jobs.slice(0, FREE_TIER_LIMIT) : jobs;
+  const downloadCount = downloadJobs.length;
+  const progressRatio =
+    progress.total > 0 ? (progress.saved + progress.failed) / progress.total : 0;
 
   async function startDownload() {
     if (startedRef.current) return;
     startedRef.current = true;
-    setHasStarted(true);
     cancelSignal.cancelled = false;
 
-    await runDownloadQueue(jobs, exportDestination, (prog, job) => {
-      updateProgress(prog, job);
-    }, cancelSignal);
+    const activeJobs = isPurchased ? jobs : jobs.slice(0, FREE_TIER_LIMIT);
+
+    if (debugMode) {
+      await runDebugQueue(activeJobs, (prog, job) => updateProgress(prog, job), cancelSignal);
+    } else {
+      await runDownloadQueue(
+        activeJobs,
+        exportDestination,
+        (prog, job) => updateProgress(prog, job),
+        cancelSignal
+      );
+    }
 
     router.replace('/complete');
   }
 
   useEffect(() => {
-    if (isConfirmed) {
-      startDownload();
-    }
+    if (isConfirmed) startDownload();
   }, [isConfirmed]);
+
+  async function handlePurchase() {
+    setPurchasing(true);
+    try {
+      const result = await purchaseUnlock();
+      if (result === 'purchased') {
+        setPurchased(true);
+      }
+    } catch (err) {
+      Alert.alert(
+        'Purchase failed',
+        err instanceof Error ? err.message : 'Something went wrong. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setPurchasing(false);
+    }
+  }
+
+  async function handleRestore() {
+    setPurchasing(true);
+    try {
+      const unlocked = await restoreUnlock();
+      if (unlocked) {
+        setPurchased(true);
+        Alert.alert('Purchase restored', 'All your memories will be downloaded.', [{ text: 'OK' }]);
+      } else {
+        Alert.alert(
+          'Nothing to restore',
+          'No previous purchase found for this Apple ID.',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch {
+      Alert.alert('Restore failed', 'Please check your connection and try again.', [{ text: 'OK' }]);
+    } finally {
+      setPurchasing(false);
+    }
+  }
 
   function handleCancel() {
     Alert.alert('Cancel download?', 'Memories downloaded so far will stay in your library.', [
@@ -67,20 +121,84 @@ export default function ProcessingScreen() {
     ]);
   }
 
-  // Confirmation + destination picker gate before starting
+  // ── Confirmation + options screen ──────────────────────────────────────────
   if (!isConfirmed) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.container}>
-          <Text style={styles.title}>Ready to export</Text>
 
+          {/* Summary */}
           <View style={styles.summaryBox}>
             <Row label="Memories found" value={allMemoriesCount.toLocaleString()} />
-            <Row label="Will be downloaded" value={total.toLocaleString()} highlight />
+            <Row
+              label="Will be downloaded"
+              value={`${downloadCount.toLocaleString()}${needsPaywall ? ` of ${allMemoriesCount.toLocaleString()}` : ''}`}
+              highlight
+            />
             {skippedCount > 0 && (
               <Row label="Skipped (missing data)" value={String(skippedCount)} dim />
             )}
           </View>
+
+          {/* Paywall */}
+          {allMemoriesCount > FREE_TIER_LIMIT && (
+            <View style={[styles.paywallCard, isPurchased && styles.paywallCardUnlocked]}>
+              {isPurchased ? (
+                <>
+                  <Text style={styles.paywallUnlockedTitle}>✓ All memories unlocked</Text>
+                  {debugMode && (
+                    <TouchableOpacity
+                      onPress={() => setPurchased(false)}
+                      style={styles.debugToggle}
+                    >
+                      <Text style={styles.debugToggleText}>⚙️ [Debug] Simulate not purchased</Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Text style={styles.paywallTitle}>
+                    Unlock all {allMemoriesCount.toLocaleString()} memories
+                  </Text>
+                  <Text style={styles.paywallSubtitle}>
+                    First {FREE_TIER_LIMIT} free · One-time $0.99 purchase
+                  </Text>
+
+                  {debugMode ? (
+                    <TouchableOpacity
+                      style={styles.unlockBtn}
+                      onPress={() => setPurchased(true)}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.unlockBtnText}>⚙️ [Debug] Simulate purchase</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <>
+                      <TouchableOpacity
+                        style={styles.unlockBtn}
+                        onPress={handlePurchase}
+                        disabled={purchasing}
+                        activeOpacity={0.85}
+                      >
+                        {purchasing ? (
+                          <ActivityIndicator color="#000" />
+                        ) : (
+                          <Text style={styles.unlockBtnText}>Unlock All — $0.99</Text>
+                        )}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={handleRestore}
+                        disabled={purchasing}
+                        style={styles.restoreBtn}
+                      >
+                        <Text style={styles.restoreText}>Restore Purchase</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </>
+              )}
+            </View>
+          )}
 
           {/* Destination picker */}
           <Text style={styles.sectionLabel}>Save memories to</Text>
@@ -112,14 +230,18 @@ export default function ProcessingScreen() {
             onPress={() => setIsConfirmed(true)}
             activeOpacity={0.85}
           >
-            <Text style={styles.ctaText}>Start downloading →</Text>
+            <Text style={styles.ctaText}>
+              {needsPaywall
+                ? `Download first ${FREE_TIER_LIMIT} free →`
+                : 'Start downloading →'}
+            </Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
-  // Download in progress
+  // ── Download in progress ───────────────────────────────────────────────────
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
@@ -139,6 +261,7 @@ export default function ProcessingScreen() {
           <ProgressBar progress={progressRatio} />
           <Text style={styles.progressLabel}>
             {Math.round(progressRatio * 100)}% · {progress.active} active
+            {debugMode ? '  ⚙️ debug' : ''}
           </Text>
         </View>
 
@@ -156,6 +279,8 @@ export default function ProcessingScreen() {
     </SafeAreaView>
   );
 }
+
+// ── Sub-components ─────────────────────────────────────────────────────────
 
 function DestOption({
   label,
@@ -199,7 +324,7 @@ const destStyles = StyleSheet.create({
     backgroundColor: '#1a1800',
   },
   icon: { fontSize: 26, marginBottom: 8 },
-  label: { color: '#888', fontWeight: '700', fontSize: 14, marginBottom: 4, textAlign: 'center' },
+  label: { color: '#888', fontWeight: '700', fontSize: 13, marginBottom: 4, textAlign: 'center' },
   labelSelected: { color: '#FFFC00' },
   subtitle: { color: '#555', fontSize: 11, lineHeight: 15, textAlign: 'center' },
   dot: {
@@ -265,8 +390,39 @@ const styles = StyleSheet.create({
     backgroundColor: '#111',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 20,
+    marginBottom: 16,
   },
+
+  paywallCard: {
+    backgroundColor: '#1a1400',
+    borderColor: '#3a2e00',
+    borderWidth: 1.5,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+  },
+  paywallCardUnlocked: {
+    backgroundColor: '#061206',
+    borderColor: '#1a3d1a',
+  },
+  paywallTitle: { color: '#FFFC00', fontWeight: '800', fontSize: 15, marginBottom: 4 },
+  paywallSubtitle: { color: '#888', fontSize: 13, lineHeight: 18, marginBottom: 14 },
+  paywallUnlockedTitle: { color: '#4caf50', fontWeight: '700', fontSize: 14 },
+
+  unlockBtn: {
+    backgroundColor: '#FFFC00',
+    borderRadius: 10,
+    paddingVertical: 13,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  unlockBtnText: { color: '#000', fontWeight: '800', fontSize: 15 },
+
+  restoreBtn: { alignItems: 'center', paddingVertical: 4 },
+  restoreText: { color: '#555', fontSize: 13 },
+
+  debugToggle: { marginTop: 10 },
+  debugToggleText: { color: '#555', fontSize: 12 },
 
   sectionLabel: {
     color: '#666',
@@ -276,18 +432,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     marginBottom: 10,
   },
-
-  pickerRow: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    gap: 12,
-  },
+  pickerRow: { flexDirection: 'row', marginBottom: 16, gap: 12 },
 
   warningBox: {
     backgroundColor: '#1a0f00',
     borderRadius: 10,
     padding: 14,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   warningText: { color: '#b87333', fontSize: 13, lineHeight: 18 },
 

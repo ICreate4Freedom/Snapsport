@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
 import * as Linking from 'expo-linking';
 import React, { useEffect, useRef } from 'react';
+import { generateMockMemories } from '../src/data/mockMemories';
+import { useStore } from '../src/store/useStore';
 import {
   ActionSheetIOS,
   Animated,
@@ -168,6 +170,7 @@ function StepCard({ step, delay }: { step: Step; delay: number }) {
 
 export default function OnboardingScreen() {
   const headerAnim = useRef(new Animated.Value(0)).current;
+  const { setMemories, setDebugMode } = useStore();
 
   useEffect(() => {
     Animated.timing(headerAnim, {
@@ -176,6 +179,12 @@ export default function OnboardingScreen() {
       useNativeDriver: true,
     }).start();
   }, []);
+
+  function handleDebugMode() {
+    setDebugMode(true);
+    setMemories(generateMockMemories());
+    router.push({ pathname: '/processing', params: { skipped: '3' } });
+  }
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -214,6 +223,12 @@ export default function OnboardingScreen() {
             SnapsPort downloads memories directly from Snapchat to your device. No account, no server, nothing shared with us.
           </Text>
         </View>
+
+        {__DEV__ && (
+          <TouchableOpacity style={styles.debugBtn} onPress={handleDebugMode} activeOpacity={0.7}>
+            <Text style={styles.debugBtnText}>⚙️  Debug Mode — skip to processing</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -309,4 +324,14 @@ const styles = StyleSheet.create({
   },
   privacyTitle: { color: '#4caf50', fontWeight: '700', fontSize: 13, marginBottom: 4 },
   privacyText: { color: '#4a7a4a', fontSize: 12, lineHeight: 17 },
+
+  debugBtn: {
+    marginTop: 24,
+    borderColor: '#333',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  debugBtnText: { color: '#555', fontSize: 13 },
 });

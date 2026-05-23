@@ -2,6 +2,7 @@ import { router, Stack } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { initRevenueCat, checkUnlockStatus } from '../src/core/revenuecat';
 import { useStore } from '../src/store/useStore';
 
 function isZipUri(url: string) {
@@ -10,10 +11,10 @@ function isZipUri(url: string) {
 
 export default function RootLayout() {
   const setPendingFileUri = useStore((s) => s.setPendingFileUri);
+  const setPurchased = useStore((s) => s.setPurchased);
 
   function handleIncomingUrl(url: string) {
     if (!url) return;
-    // Accept file:// URIs (opened via Open In… from Mail/Files)
     if (isZipUri(url)) {
       setPendingFileUri(url);
       router.replace('/import');
@@ -21,7 +22,13 @@ export default function RootLayout() {
   }
 
   useEffect(() => {
-    // App opened via document association
+    // Initialize RevenueCat and restore any prior purchase
+    initRevenueCat();
+    checkUnlockStatus().then((purchased) => {
+      if (purchased) setPurchased(true);
+    });
+
+    // App opened via document association (Open In… from Mail/Files)
     Linking.getInitialURL().then((url) => {
       if (url) handleIncomingUrl(url);
     });

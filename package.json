@@ -25,6 +25,7 @@
     "react-native": "0.85.3",
     "react-native-safe-area-context": "latest",
     "react-native-screens": "latest",
+    "react-native-purchases": "^8.0.0",
     "react-native-zip-archive": "^8.0.1",
     "zustand": "^5.0.2"
   },
