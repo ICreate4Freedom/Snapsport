@@ -6,7 +6,7 @@ export type AppPhase =
   | 'onboarding'
   | 'importing'
   | 'parsing'
-  | 'ready'        // parsed, waiting for user to confirm + pay
+  | 'ready'
   | 'downloading'
   | 'complete'
   | 'error';
@@ -19,6 +19,7 @@ interface AppState {
   error: string | null;
   isPurchased: boolean;
   cancelSignal: { cancelled: boolean };
+  pendingFileUri: string | null;
 
   setPhase: (phase: AppPhase) => void;
   setMemories: (memories: MemoryItem[]) => void;
@@ -27,11 +28,11 @@ interface AppState {
   setError: (error: string) => void;
   setPurchased: (v: boolean) => void;
   cancelDownload: () => void;
+  setPendingFileUri: (uri: string | null) => void;
   reset: () => void;
 }
 
 const FREE_TIER_LIMIT = 50;
-
 const initialProgress: DownloadProgress = { total: 0, saved: 0, failed: 0, active: 0 };
 
 export const useStore = create<AppState>((set, get) => ({
@@ -42,6 +43,7 @@ export const useStore = create<AppState>((set, get) => ({
   error: null,
   isPurchased: false,
   cancelSignal: { cancelled: false },
+  pendingFileUri: null,
 
   setPhase: (phase) => set({ phase }),
 
@@ -70,7 +72,6 @@ export const useStore = create<AppState>((set, get) => ({
 
   setPurchased: (isPurchased) => {
     set({ isPurchased });
-    // Expand job list to full library if they just purchased
     const { memories } = get();
     if (isPurchased && memories.length > FREE_TIER_LIMIT) {
       const jobs: DownloadJob[] = memories.map((memory, index) => ({
@@ -87,6 +88,8 @@ export const useStore = create<AppState>((set, get) => ({
     cancelSignal.cancelled = true;
   },
 
+  setPendingFileUri: (pendingFileUri) => set({ pendingFileUri }),
+
   reset: () =>
     set({
       phase: 'onboarding',
@@ -95,6 +98,7 @@ export const useStore = create<AppState>((set, get) => ({
       progress: initialProgress,
       error: null,
       cancelSignal: { cancelled: false },
+      pendingFileUri: null,
     }),
 }));
 

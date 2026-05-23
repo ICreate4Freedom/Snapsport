@@ -10,8 +10,21 @@
       "bundleIdentifier": "com.snapsport.app",
       "buildNumber": "1",
       "infoPlist": {
-        "NSPhotoLibraryAddUsageDescription": "SnapsPort needs access to save your Snapchat memories to your photo library.",
-        "NSPhotoLibraryUsageDescription": "SnapsPort needs access to save your Snapchat memories to your photo library."
+        "NSPhotoLibraryAddUsageDescription": "SnapsPort saves your Snapchat memories directly to your photo library.",
+        "NSPhotoLibraryUsageDescription": "SnapsPort saves your Snapchat memories directly to your photo library.",
+        "LSApplicationQueriesSchemes": ["snapchat"],
+        "CFBundleDocumentTypes": [
+          {
+            "CFBundleTypeName": "ZIP Archive",
+            "CFBundleTypeRole": "Viewer",
+            "LSHandlerRank": "Alternate",
+            "LSItemContentTypes": [
+              "com.pkware.zip-archive",
+              "public.zip-archive",
+              "org.gnu.gnu-zip-archive"
+            ]
+          }
+        ]
       }
     },
     "android": {
@@ -19,6 +32,13 @@
       "permissions": [
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [{ "mimeType": "application/zip" }],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
       ]
     },
     "plugins": [
@@ -27,7 +47,7 @@
       [
         "expo-media-library",
         {
-          "photosPermission": "SnapsPort needs access to save your Snapchat memories to your photo library.",
+          "photosPermission": "SnapsPort saves your Snapchat memories directly to your photo library.",
           "savePhotosPermission": "SnapsPort needs permission to save photos to your library.",
           "isAccessMediaLocationEnabled": true
         }
@@ -35,9 +55,7 @@
     ],
     "scheme": "snapsport",
     "extra": {
-      "router": {
-        "origin": false
-      },
+      "router": { "origin": false },
       "FREE_TIER_LIMIT": 50
     }
   }
