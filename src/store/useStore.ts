@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { MemoryItem } from '@/core/parser';
-import { DownloadJob, DownloadProgress } from '@/core/downloader';
+import { MemoryItem } from '../core/parser';
+import { DownloadJob, DownloadProgress } from '../core/downloader';
 
 export type AppPhase =
   | 'onboarding'

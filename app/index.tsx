@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { StepCard } from '@/components/StepCard';
+import { StepCard } from '../src/components/StepCard';
 
 export default function OnboardingScreen() {
   return (
