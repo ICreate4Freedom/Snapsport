@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import React from 'react';
-import { SafeAreaView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useStore } from '../src/store/useStore';
 
 export default function CompleteScreen() {
@@ -26,7 +26,7 @@ export default function CompleteScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <Text style={styles.emoji}>{hasFailures ? '⚠️' : '🎉'}</Text>
         <Text style={styles.title}>
           {hasFailures ? 'Mostly done!' : 'All done!'}
@@ -73,7 +73,7 @@ export default function CompleteScreen() {
         <TouchableOpacity style={styles.doneBtn} onPress={handleDone} activeOpacity={0.85}>
           <Text style={styles.doneBtnText}>Done</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -95,7 +95,7 @@ const statStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#000' },
-  container: { flex: 1, padding: 24, alignItems: 'center' },
+  container: { padding: 24, paddingBottom: 52, alignItems: 'center' },
 
   emoji: { fontSize: 64, marginTop: 32, marginBottom: 16 },
   title: { color: '#FFF', fontSize: 28, fontWeight: '900', marginBottom: 12, textAlign: 'center' },
