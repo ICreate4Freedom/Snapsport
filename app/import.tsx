@@ -56,14 +56,16 @@ export default function ImportScreen() {
     return () => handler.remove();
   }, [isExtracting]);
 
-  // Auto-import if a file was opened via Share/Open-in
+  // Auto-import if a file was opened via Share/Open-in.
+  // Depends on pendingFileUri so it fires even when the screen is already mounted.
   useEffect(() => {
-    if (pendingFileUri) {
+    if (pendingFileUri && !isLoading) {
       const uri = pendingFileUri;
       setPendingFileUri(null);
       handleImportFromUris([uri]);
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingFileUri]);
 
   async function ensurePermission(): Promise<boolean> {
     if (mediaPermission?.granted) return true;
@@ -129,9 +131,10 @@ export default function ImportScreen() {
 
         await FileSystem.makeDirectoryAsync(extractDirs[i], { intermediates: true });
 
-        // react-native-zip-archive needs bare POSIX paths, not file:// URIs
-        const sourcePath = zipUris[i].replace(/^file:\/\//, '');
-        const targetPath = extractDirs[i].replace(/^file:\/\//, '');
+        // react-native-zip-archive needs bare POSIX paths, not file:// URIs.
+        // Also decode percent-encoding — Expo Go adds %40, %2F etc. to cacheDirectory.
+        const sourcePath = stripFileUri(zipUris[i]);
+        const targetPath = stripFileUri(extractDirs[i]);
 
         await unzip(sourcePath, targetPath, 'UTF-8', (zipProgress) => {
           // Combine completed ZIPs + current ZIP's progress into an overall 0–1 value
@@ -247,6 +250,15 @@ export default function ImportScreen() {
   );
 }
 
+function stripFileUri(uri: string): string {
+  const stripped = uri.replace(/^file:\/\//, '');
+  try {
+    return decodeURIComponent(stripped);
+  } catch {
+    return stripped;
+  }
+}
+
 async function findMemoriesJson(extractDirs: string[]): Promise<string> {
   for (const extractDir of extractDirs) {
     const candidates = [
@@ -259,13 +271,18 @@ async function findMemoriesJson(extractDirs: string[]): Promise<string> {
       if (info.exists) return path;
     }
 
-    // Try one level of subdirectories
+    // Try one level of subdirectories (and their json/ child)
+    // Covers exports like: mydata/memories_history.json  AND  mydata/json/memories_history.json
     try {
       const contents = await FileSystem.readDirectoryAsync(extractDir);
       for (const entry of contents) {
         const sub = `${extractDir}${entry}/memories_history.json`;
         const info = await FileSystem.getInfoAsync(sub);
         if (info.exists) return sub;
+
+        const subJson = `${extractDir}${entry}/json/memories_history.json`;
+        const infoJson = await FileSystem.getInfoAsync(subJson);
+        if (infoJson.exists) return subJson;
       }
     } catch {
       // Directory may be empty or unreadable — continue to next ZIP

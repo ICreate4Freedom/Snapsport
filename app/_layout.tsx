@@ -16,7 +16,9 @@ Notifications.setNotificationHandler({
 });
 
 function isZipUri(url: string) {
-  return url.endsWith('.zip') || url.includes('.zip?') || url.startsWith('file://');
+  let decoded = url;
+  try { decoded = decodeURIComponent(url); } catch {}
+  return decoded.endsWith('.zip') || decoded.includes('.zip?') || decoded.includes('.zip/');
 }
 
 export default function RootLayout() {
