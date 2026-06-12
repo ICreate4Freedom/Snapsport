@@ -18,25 +18,9 @@
           "ms-outlook",
           "ymail",
           "readdle-spark",
-          "protonmail",
-          "snapchat",
-          "googlegmail",
-          "ms-outlook",
-          "ymail",
-          "readdle-spark",
           "protonmail"
         ],
         "CFBundleDocumentTypes": [
-          {
-            "CFBundleTypeName": "ZIP Archive",
-            "CFBundleTypeRole": "Viewer",
-            "LSHandlerRank": "Alternate",
-            "LSItemContentTypes": [
-              "com.pkware.zip-archive",
-              "public.zip-archive",
-              "org.gnu.gnu-zip-archive"
-            ]
-          },
           {
             "CFBundleTypeName": "ZIP Archive",
             "CFBundleTypeRole": "Viewer",

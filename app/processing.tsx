@@ -86,6 +86,8 @@ export default function ProcessingScreen() {
 
   useEffect(() => {
     if (isConfirmed) startDownload();
+    // startDownload intentionally omitted — startedRef guards against re-runs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConfirmed]);
 
   async function handlePurchase() {
