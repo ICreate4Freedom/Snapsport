@@ -7,6 +7,10 @@ const RC_API_KEY_IOS = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
 const ENTITLEMENT_ID = 'unlock';
 
 export function initRevenueCat() {
+  if (!RC_API_KEY_IOS) {
+    console.warn('RevenueCat API key not set — purchases disabled');
+    return;
+  }
   Purchases.configure({ apiKey: RC_API_KEY_IOS });
   if (__DEV__) Purchases.setLogLevel(LOG_LEVEL.DEBUG);
 }
