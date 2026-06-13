@@ -1,5 +1,5 @@
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as MediaLibrary from 'expo-media-library';
 import * as Notifications from 'expo-notifications';
 import { router, useNavigation } from 'expo-router';
@@ -14,7 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { unzip } from 'react-native-zip-archive';
+import { unzip, subscribe } from 'react-native-zip-archive';
 import { ProgressBar } from '../src/components/ProgressBar';
 import { scanMediaFiles } from '../src/core/parser';
 import { useStore } from '../src/store/useStore';
@@ -130,12 +130,17 @@ export default function ImportScreen() {
         const sourcePath = stripFileUri(zipUris[i]);
         const targetPath = stripFileUri(extractDir);
 
-        await unzip(sourcePath, targetPath, 'UTF-8', (zipProgress) => {
-          const pct = Math.min(Math.max(zipProgress, 0), 1);
+        const subscription = subscribe((data) => {
+          const pct = Math.min(Math.max(data.progress, 0), 1);
           setExtractProgress((i + pct) / zipUris.length);
         });
+        try {
+          await unzip(sourcePath, targetPath, 'UTF-8');
+        } finally {
+          subscription.remove();
+        }
       }
-
+      
       setExtractProgress(1);
 
       if (appStateRef.current !== 'active') {
