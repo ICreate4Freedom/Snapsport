@@ -1,6 +1,6 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import * as MediaLibrary from 'expo-media-library';
+import * as MediaLibrary from 'expo-media-library/legacy';
 import * as Notifications from 'expo-notifications';
 import { router, useNavigation } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
@@ -112,6 +112,7 @@ export default function ImportScreen() {
     if (!(await ensurePermission())) return;
 
     const extractedDirs: string[] = [];
+    const failedZips: string[] = [];
 
     try {
       setPhase('extracting');
@@ -123,24 +124,38 @@ export default function ImportScreen() {
         setExtractProgress(i / zipUris.length);
 
         const extractDir = `${FileSystem.cacheDirectory}snapsport_extract_${i}/`;
-        extractedDirs.push(extractDir);
-
-        await FileSystem.makeDirectoryAsync(extractDir, { intermediates: true });
-
         const sourcePath = stripFileUri(zipUris[i]);
         const targetPath = stripFileUri(extractDir);
 
-        const subscription = subscribe((data) => {
-          const pct = Math.min(Math.max(data.progress, 0), 1);
-          setExtractProgress((i + pct) / zipUris.length);
-        });
         try {
-          await unzip(sourcePath, targetPath, 'UTF-8');
-        } finally {
-          subscription.remove();
+          await FileSystem.makeDirectoryAsync(extractDir, { intermediates: true });
+
+          const subscription = subscribe((data) => {
+            const pct = Math.min(Math.max(data.progress, 0), 1);
+            setExtractProgress((i + pct) / zipUris.length);
+          });
+          try {
+            await unzip(sourcePath, targetPath, 'UTF-8');
+          } finally {
+            subscription.remove();
+          }
+          extractedDirs.push(extractDir);
+        } catch {
+          // One bad ZIP (corrupt, password-protected, wrong file type)
+          // shouldn't discard memories already extracted from the others.
+          await FileSystem.deleteAsync(extractDir, { idempotent: true });
+          failedZips.push(decodeZipName(zipUris[i]));
         }
       }
-      
+
+      if (extractedDirs.length === 0) {
+        throw new Error(
+          zipUris.length > 1
+            ? "None of the selected ZIPs could be opened. Make sure they're valid, non-password-protected Snapchat export files."
+            : "This ZIP couldn't be opened. Make sure it's a valid, non-password-protected Snapchat export file."
+        );
+      }
+
       setExtractProgress(1);
 
       if (appStateRef.current !== 'active') {
@@ -160,6 +175,15 @@ export default function ImportScreen() {
       // Keep extractedDirs alive — downloader cleans them up after saving
       setExtractedDirs(extractedDirs);
       setMemories(memories);
+
+      if (failedZips.length > 0) {
+        Alert.alert(
+          'Some ZIPs were skipped',
+          `Couldn't open: ${failedZips.join(', ')}\n\nThe rest imported successfully and are ready to save.`,
+          [{ text: 'OK' }]
+        );
+      }
+
       router.replace({ pathname: '/processing', params: { skipped: String(skipped) } });
     } catch (err) {
       await cleanupDirs(extractedDirs);
@@ -249,6 +273,11 @@ function stripFileUri(uri: string): string {
 
 async function cleanupDirs(dirs: string[]) {
   await Promise.all(dirs.map((d) => FileSystem.deleteAsync(d, { idempotent: true })));
+}
+
+function decodeZipName(uri: string): string {
+  const stripped = stripFileUri(uri);
+  return stripped.split('/').pop() ?? stripped;
 }
 
 const styles = StyleSheet.create({

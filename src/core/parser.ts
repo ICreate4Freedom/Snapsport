@@ -18,29 +18,45 @@ const VIDEO_EXTENSIONS = new Set(['.mp4', '.mov']);
 const MEDIA_EXTENSIONS = new Set([...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS]);
 
 export async function scanMediaFiles(extractedDirs: string[]): Promise<ScanResult> {
-  const memories: MemoryItem[] = [];
+  const dated: MemoryItem[] = [];
+  const undated: Omit<MemoryItem, 'date'>[] = [];
   let skipped = 0;
 
   for (const dir of extractedDirs) {
     const result = await walkDir(ensureTrailingSlash(dir));
-    memories.push(...result.memories);
+    dated.push(...result.dated);
+    undated.push(...result.undated);
     skipped += result.skipped;
   }
 
-  memories.sort((a, b) => b.date.getTime() - a.date.getTime());
+  dated.sort((a, b) => b.date.getTime() - a.date.getTime());
 
-  return { memories, skipped };
+  // Files with no recoverable date are grouped just before the earliest dated
+  // memory in this import, rather than defaulting to "now" (which would push
+  // them to the front of the library instead of lumping them with their batch).
+  const earliest = dated.length > 0 ? dated[dated.length - 1].date : new Date();
+  const undatedAnchor = new Date(earliest.getTime() - 1000);
+  const undatedMemories = undated.map((m) => ({ ...m, date: undatedAnchor }));
+
+  return { memories: [...dated, ...undatedMemories], skipped };
 }
 
-async function walkDir(dir: string): Promise<ScanResult> {
-  const memories: MemoryItem[] = [];
+interface WalkResult {
+  dated: MemoryItem[];
+  undated: Omit<MemoryItem, 'date'>[];
+  skipped: number;
+}
+
+async function walkDir(dir: string): Promise<WalkResult> {
+  const dated: MemoryItem[] = [];
+  const undated: Omit<MemoryItem, 'date'>[] = [];
   let skipped = 0;
 
   let entries: string[];
   try {
     entries = await FileSystem.readDirectoryAsync(dir);
   } catch {
-    return { memories, skipped };
+    return { dated, undated, skipped };
   }
 
   for (const entry of entries) {
@@ -49,15 +65,20 @@ async function walkDir(dir: string): Promise<ScanResult> {
 
     if (MEDIA_EXTENSIONS.has(ext)) {
       const mediaType: MediaType = IMAGE_EXTENSIONS.has(ext) ? 'PHOTO' : 'VIDEO';
-      const date = parseDateFromFilename(entry) ?? new Date();
-      memories.push({ localPath: path, mediaType, date });
+      const date = parseDateFromFilename(entry);
+      if (date) {
+        dated.push({ localPath: path, mediaType, date });
+      } else {
+        undated.push({ localPath: path, mediaType });
+      }
     } else if (!ext) {
       // Likely a directory — recurse
       try {
         const info = await FileSystem.getInfoAsync(path);
         if (info.isDirectory) {
           const sub = await walkDir(`${path}/`);
-          memories.push(...sub.memories);
+          dated.push(...sub.dated);
+          undated.push(...sub.undated);
           skipped += sub.skipped;
         }
       } catch {
@@ -66,7 +87,7 @@ async function walkDir(dir: string): Promise<ScanResult> {
     }
   }
 
-  return { memories, skipped };
+  return { dated, undated, skipped };
 }
 
 function getExtension(filename: string): string {

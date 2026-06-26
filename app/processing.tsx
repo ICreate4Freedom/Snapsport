@@ -98,6 +98,7 @@ export default function ProcessingScreen() {
       );
     }
 
+    if (cancelSignal.cancelled) return;
     router.replace('/complete');
   }
 
