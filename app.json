@@ -7,7 +7,7 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.snapsport.app",
+      "bundleIdentifier": "com.icode4freedom.snapsport",
       "buildNumber": "1",
       "infoPlist": {
         "NSPhotoLibraryAddUsageDescription": "SnapsPort saves your Snapchat memories directly to your photo library.",
@@ -32,7 +32,8 @@
             ]
           }
         ],
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "LSSupportsOpeningDocumentsInPlace": false
       }
     },
     "android": {
