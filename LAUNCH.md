@@ -3,8 +3,9 @@
 Track progress here. Items are ordered by dependency — don't skip ahead.
 
 **Status as of 2026-07-01:** App is functionally complete and builds clean (`tsc` passes).
-The remaining launch gates are **real In-App Purchase setup** and **App Store Connect
-submission assets** — see the two blockers in §1 and §4–6. Everything code-level is done.
+IAP is fully wired (real App Store product + production `appl_` key on EAS). Remaining gates
+are a **TestFlight build + real-StoreKit purchase re-test** (§2/§7) and the **App Store Connect
+submission assets** (§4–6). Everything code-level is done.
 
 ---
 
@@ -14,16 +15,13 @@ submission assets** — see the two blockers in §1 and §4–6. Everything code
 - [x] Add iOS app with bundle ID `com.snapsport.app`
 - [x] Entitlement named exactly `unlock` created in RevenueCat
 - [x] Test Store product `unlock_all_test` created + attached to `unlock` (dev testing works)
-- [ ] **BLOCKER** — In App Store Connect: create a **Non-Consumable** IAP product, price $0.99
-      Suggested product ID: `snapsport_unlock`
-- [ ] **BLOCKER** — In RevenueCat: add the **App Store** product, attach it to the `unlock`
-      entitlement, and point the `default` offering's package at it (currently the offering
-      only has the Test Store product)
-- [ ] **BLOCKER** — Get your production **`appl_...`** iOS key from RevenueCat and set it as
-      the `EXPO_PUBLIC_REVENUECAT_API_KEY` env var. NOTE: the code reads this from the
-      environment (see `src/core/revenuecat.ts`), and `.env` is gitignored — so you must set
-      it as an **EAS secret** for production builds, not just in local `.env`. Right now it
-      holds a `test_...` Test Store key, which silently disables real purchases.
+- [x] In App Store Connect: created the **Non-Consumable** IAP `snapsport_unlock`, $0.99
+- [x] In RevenueCat: App Store product added, attached to the `unlock` entitlement, and the
+      `default` offering's package points at it (Test Store product kept on the same package
+      for dev)
+- [x] Production **`appl_...`** iOS key set as a **sensitive EAS env var**
+      (`EXPO_PUBLIC_REVENUECAT_API_KEY`, `production` environment — verified). Local `.env`
+      keeps the `test_...` key for dev; the code reads whichever is present at build time.
 - [x] Native project generated + `pod install` run (`ios/` is committed)
 - [x] Paywall verified for >50 memories (tested via Test Store)
 
@@ -76,7 +74,7 @@ submission assets** — see the two blockers in §1 and §4–6. Everything code
 ## 7. EAS build config
 
 - [x] `eas.json` submit profile wired to `$APPLE_ID` / `$ASC_APP_ID` / `$APPLE_TEAM_ID`
-- [ ] Set `EXPO_PUBLIC_REVENUECAT_API_KEY` as an EAS secret (see §1)
+- [x] `EXPO_PUBLIC_REVENUECAT_API_KEY` set as a production EAS env var (see §1)
 - [ ] Run `eas build --platform ios --profile preview` → distribute via TestFlight
 - [ ] Test the TestFlight build on at least 2 devices before submitting to App Store
 
