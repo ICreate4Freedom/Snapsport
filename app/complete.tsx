@@ -24,7 +24,6 @@ export default function CompleteScreen() {
     reset,
     exportDestination,
     memories,
-    jobs,
     isPurchased,
     setPurchased,
     debugMode,

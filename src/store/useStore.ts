@@ -31,7 +31,7 @@ interface AppState {
   setPhase: (phase: AppPhase) => void;
   setMemories: (memories: MemoryItem[]) => void;
   setExtractedDirs: (dirs: string[]) => void;
-  updateProgress: (progress: DownloadProgress, job: DownloadJob) => void;
+  updateProgress: (progress: DownloadProgress) => void;
   setError: (error: string) => void;
   cancelDownload: () => void;
   setPendingFileUri: (uri: string | null) => void;
@@ -70,13 +70,10 @@ export const useStore = create<AppState>((set, get) => ({
 
   setExtractedDirs: (extractedDirs) => set({ extractedDirs }),
 
-  updateProgress: (progress, updatedJob) =>
-    set((state) => ({
-      progress,
-      jobs: state.jobs.map((j) =>
-        j.index === updatedJob.index ? { ...j, ...updatedJob } : j
-      ),
-    })),
+  // Only `progress` drives the UI; per-job status is never rendered, so we don't
+  // remap the jobs array on every tick — that made a full run O(n²) in allocations
+  // (2 callbacks per job × an O(n) map) for zero observable benefit.
+  updateProgress: (progress) => set({ progress }),
 
   setError: (error) => set({ error, phase: 'error' }),
 

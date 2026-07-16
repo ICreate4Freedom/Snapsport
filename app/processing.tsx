@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -46,11 +46,16 @@ export default function ProcessingScreen() {
   const needsPaywall = !isResume && allMemoriesCount > FREE_TIER_LIMIT && !isPurchased;
 
   // In resume mode: jobs from offset onwards. Otherwise: all or free-tier slice.
-  const downloadJobs = isResume
-    ? jobs.slice(jobOffset)
-    : needsPaywall
-      ? jobs.slice(0, FREE_TIER_LIMIT)
-      : jobs;
+  // Memoized so the per-progress-tick re-render doesn't re-slice the whole array.
+  const downloadJobs = useMemo(
+    () =>
+      isResume
+        ? jobs.slice(jobOffset)
+        : needsPaywall
+          ? jobs.slice(0, FREE_TIER_LIMIT)
+          : jobs,
+    [jobs, isResume, needsPaywall, jobOffset]
+  );
   const downloadCount = downloadJobs.length;
 
   const progressRatio =
@@ -76,11 +81,13 @@ export default function ProcessingScreen() {
 
     // Batch progress is reported relative to its own slice — offset it by
     // the carried-over base so the store always holds the cumulative total.
-    const handleProgress = (prog: typeof progress, job: Parameters<typeof updateProgress>[1]) =>
-      updateProgress(
-        { ...prog, total: memories.length, saved: baseSaved + prog.saved, failed: baseFailed + prog.failed },
-        job
-      );
+    const handleProgress = (prog: typeof progress) =>
+      updateProgress({
+        ...prog,
+        total: memories.length,
+        saved: baseSaved + prog.saved,
+        failed: baseFailed + prog.failed,
+      });
 
     // Only delete the extracted ZIP dirs once nothing is left to download —
     // a paywalled first batch leaves a remainder that still needs those files.
