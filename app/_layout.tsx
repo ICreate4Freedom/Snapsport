@@ -3,7 +3,7 @@ import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { initRevenueCat, checkUnlockStatus } from '../src/core/revenuecat';
+import { initRevenueCat, checkUnlockStatus, addUnlockListener } from '../src/core/revenuecat';
 import { useStore } from '../src/store/useStore';
 
 // Show extraction-complete alerts even when the app is foregrounded
@@ -35,11 +35,14 @@ export default function RootLayout() {
   }
 
   useEffect(() => {
-    // Initialize RevenueCat and restore any prior purchase
+    // Initialize RevenueCat and restore any prior purchase. 'unknown' (lookup
+    // failed) is deliberately not treated as "not purchased" — the listener below
+    // grants access if/when the entitlement resolves.
     initRevenueCat();
-    checkUnlockStatus().then((purchased) => {
-      if (purchased) setPurchased(true);
+    checkUnlockStatus().then((status) => {
+      if (status === 'active') setPurchased(true);
     });
+    const removeUnlockListener = addUnlockListener(() => setPurchased(true));
 
     // App opened via document association (Open In… from Mail/Files)
     Linking.getInitialURL().then((url) => {
@@ -48,7 +51,10 @@ export default function RootLayout() {
 
     // App already open, receives a new file
     const sub = Linking.addEventListener('url', ({ url }) => handleIncomingUrl(url));
-    return () => sub.remove();
+    return () => {
+      sub.remove();
+      removeUnlockListener();
+    };
   }, []);
 
   return (

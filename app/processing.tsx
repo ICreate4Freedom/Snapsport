@@ -16,8 +16,7 @@ import { purchaseUnlock, restoreUnlock } from '../src/core/revenuecat';
 import { useStore, FREE_TIER_LIMIT } from '../src/store/useStore';
 
 export default function ProcessingScreen() {
-  const { skipped, autoStart, startFrom } = useLocalSearchParams<{
-    skipped?: string;
+  const { autoStart, startFrom } = useLocalSearchParams<{
     autoStart?: string;
     startFrom?: string;
   }>();
@@ -42,7 +41,6 @@ export default function ProcessingScreen() {
   const jobOffset = Number(startFrom ?? 0);
 
   const allMemoriesCount = memories.length;
-  const skippedCount = parseInt(skipped ?? '0', 10);
   const needsPaywall = !isResume && allMemoriesCount > FREE_TIER_LIMIT && !isPurchased;
 
   // In resume mode: jobs from offset onwards. Otherwise: all or free-tier slice.
@@ -184,9 +182,6 @@ export default function ProcessingScreen() {
               value={`${downloadCount.toLocaleString()}${needsPaywall ? ` of ${allMemoriesCount.toLocaleString()}` : ''}`}
               highlight
             />
-            {skippedCount > 0 && (
-              <Row label="Skipped (missing data)" value={String(skippedCount)} dim />
-            )}
           </View>
 
           {allMemoriesCount > FREE_TIER_LIMIT && (

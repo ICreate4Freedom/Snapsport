@@ -10,7 +10,6 @@ export interface MemoryItem {
 
 export interface ScanResult {
   memories: MemoryItem[];
-  skipped: number;
 }
 
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.heic', '.png']);
@@ -20,13 +19,11 @@ const MEDIA_EXTENSIONS = new Set([...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS]);
 export async function scanMediaFiles(extractedDirs: string[]): Promise<ScanResult> {
   const dated: MemoryItem[] = [];
   const undated: Omit<MemoryItem, 'date'>[] = [];
-  let skipped = 0;
 
   for (const dir of extractedDirs) {
     const result = await walkDir(ensureTrailingSlash(dir));
     dated.push(...result.dated);
     undated.push(...result.undated);
-    skipped += result.skipped;
   }
 
   dated.sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -38,25 +35,23 @@ export async function scanMediaFiles(extractedDirs: string[]): Promise<ScanResul
   const undatedAnchor = new Date(earliest.getTime() - 1000);
   const undatedMemories = undated.map((m) => ({ ...m, date: undatedAnchor }));
 
-  return { memories: [...dated, ...undatedMemories], skipped };
+  return { memories: [...dated, ...undatedMemories] };
 }
 
 interface WalkResult {
   dated: MemoryItem[];
   undated: Omit<MemoryItem, 'date'>[];
-  skipped: number;
 }
 
 async function walkDir(dir: string): Promise<WalkResult> {
   const dated: MemoryItem[] = [];
   const undated: Omit<MemoryItem, 'date'>[] = [];
-  let skipped = 0;
 
   let entries: string[];
   try {
     entries = await FileSystem.readDirectoryAsync(dir);
   } catch {
-    return { dated, undated, skipped };
+    return { dated, undated };
   }
 
   for (const entry of entries) {
@@ -71,23 +66,25 @@ async function walkDir(dir: string): Promise<WalkResult> {
       } else {
         undated.push({ localPath: path, mediaType });
       }
-    } else if (!ext) {
-      // Likely a directory — recurse
+    } else {
+      // Not a recognized media file — but it may still be a directory, including
+      // one whose name contains a dot (the old "no extension" heuristic wrongly
+      // treated those as files and skipped any media inside them). Check, don't guess.
       try {
         const info = await FileSystem.getInfoAsync(path);
         if (info.isDirectory) {
           const sub = await walkDir(`${path}/`);
           dated.push(...sub.dated);
           undated.push(...sub.undated);
-          skipped += sub.skipped;
         }
+        // Non-media file (json/html/etc.) → intentionally ignored.
       } catch {
-        skipped++;
+        // Unreadable entry → ignore.
       }
     }
   }
 
-  return { dated, undated, skipped };
+  return { dated, undated };
 }
 
 function getExtension(filename: string): string {

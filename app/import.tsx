@@ -163,7 +163,7 @@ export default function ImportScreen() {
       }
 
       setPhase('scanning');
-      const { memories, skipped } = await scanMediaFiles(extractedDirs);
+      const { memories } = await scanMediaFiles(extractedDirs);
 
       if (memories.length === 0) {
         await cleanupDirs(extractedDirs);
@@ -184,7 +184,7 @@ export default function ImportScreen() {
         );
       }
 
-      router.replace({ pathname: '/processing', params: { skipped: String(skipped) } });
+      router.replace('/processing');
     } catch (err) {
       await cleanupDirs(extractedDirs);
       const msg = err instanceof Error ? err.message : 'Something went wrong';

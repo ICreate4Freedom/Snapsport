@@ -199,7 +199,7 @@ export default function OnboardingScreen() {
   function handleDebugProcessing() {
     setDebugMode(true);
     setMemories(generateMockMemories());
-    router.push({ pathname: '/processing', params: { skipped: '3' } });
+    router.push('/processing');
   }
 
   function handleDebugComplete(withFailures: boolean) {

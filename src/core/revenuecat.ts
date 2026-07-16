@@ -1,4 +1,4 @@
-import Purchases, { LOG_LEVEL } from 'react-native-purchases';
+import Purchases, { LOG_LEVEL, CustomerInfoUpdateListener } from 'react-native-purchases';
 
 // Get this from https://app.revenuecat.com → Project → API Keys → iOS
 const RC_API_KEY_IOS = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
@@ -22,13 +22,32 @@ export function initRevenueCat() {
   if (__DEV__) Purchases.setLogLevel(LOG_LEVEL.DEBUG);
 }
 
-export async function checkUnlockStatus(): Promise<boolean> {
+export type UnlockStatus = 'active' | 'inactive' | 'unknown';
+
+export async function checkUnlockStatus(): Promise<UnlockStatus> {
   try {
     const info = await Purchases.getCustomerInfo();
-    return !!info.entitlements.active[ENTITLEMENT_ID];
-  } catch {
-    return false;
+    return info.entitlements.active[ENTITLEMENT_ID] ? 'active' : 'inactive';
+  } catch (err) {
+    // A failed check is NOT proof of "not purchased" — a returning paid user must
+    // not be shoved behind the paywall because a network hiccup broke the lookup.
+    // Report 'unknown'; addUnlockListener grants access once the SDK can refresh.
+    console.warn('checkUnlockStatus failed:', err);
+    return 'unknown';
   }
+}
+
+// Grants access whenever RevenueCat refreshes CustomerInfo and the entitlement is
+// active — covers network recovery after a failed startup check, a restore, or a
+// purchase made on another device, without requiring an app relaunch. Grant-only
+// by design: never revokes here, to avoid a transient empty refresh downgrading a
+// paying user mid-session. Returns an unsubscribe function.
+export function addUnlockListener(onActive: () => void): () => void {
+  const listener: CustomerInfoUpdateListener = (info) => {
+    if (info.entitlements.active[ENTITLEMENT_ID]) onActive();
+  };
+  Purchases.addCustomerInfoUpdateListener(listener);
+  return () => Purchases.removeCustomerInfoUpdateListener(listener);
 }
 
 export type PurchaseResult =
