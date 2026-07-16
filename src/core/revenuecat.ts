@@ -24,13 +24,21 @@ export async function checkUnlockStatus(): Promise<boolean> {
   }
 }
 
-export async function purchaseUnlock(): Promise<'purchased' | 'cancelled'> {
+export type PurchaseResult =
+  | 'purchased' // entitlement is active
+  | 'cancelled' // user backed out — no charge occurred
+  | 'unverified'; // purchase call resolved but entitlement isn't active (may have charged)
+
+export async function purchaseUnlock(): Promise<PurchaseResult> {
   const offerings = await Purchases.getOfferings();
   const pkg = offerings.current?.availablePackages?.[0];
   if (!pkg) throw new Error('No offerings configured in RevenueCat dashboard.');
   try {
     const { customerInfo } = await Purchases.purchasePackage(pkg);
-    return customerInfo.entitlements.active[ENTITLEMENT_ID] ? 'purchased' : 'cancelled';
+    // Only a genuine user cancel throws with userCancelled. If we get here the
+    // purchase call completed, so a charge may have occurred — never treat a
+    // missing entitlement as a cancel.
+    return customerInfo.entitlements.active[ENTITLEMENT_ID] ? 'purchased' : 'unverified';
   } catch (err: any) {
     if (err?.userCancelled) return 'cancelled';
     throw err;

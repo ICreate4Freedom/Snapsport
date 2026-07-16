@@ -114,13 +114,14 @@ export default function ProcessingScreen() {
       const result = await purchaseUnlock();
       if (result === 'purchased') {
         setPurchased(true);
-      } else {
+      } else if (result === 'unverified') {
         Alert.alert(
-          'Purchase not completed',
-          "The purchase didn't go through — no charge was made. Please try again.",
+          'Purchase not verified',
+          "If your payment went through, it may take a moment to process. Tap Restore Purchase to unlock — you won't be charged twice.",
           [{ text: 'OK' }]
         );
       }
+      // 'cancelled' — user backed out; nothing to do.
     } catch (err) {
       Alert.alert(
         'Purchase failed',
