@@ -22,21 +22,55 @@ export interface DownloadProgress {
 type ProgressCallback = (progress: DownloadProgress, job: DownloadJob) => void;
 
 const CONCURRENCY = 5;
+const ALBUM_NAME = 'SnapsPort';
 
-async function saveToLibrary(localPath: string, destination: ExportDestination): Promise<void> {
-  const asset = await MediaLibrary.createAssetAsync(localPath);
+type Asset = Awaited<ReturnType<typeof MediaLibrary.createAssetAsync>>;
+type Album = NonNullable<Awaited<ReturnType<typeof MediaLibrary.getAlbumAsync>>>;
 
-  if (destination === 'album') {
-    try {
-      const album = await MediaLibrary.getAlbumAsync('SnapsPort');
-      if (album) {
-        await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
-      } else {
-        await MediaLibrary.createAlbumAsync('SnapsPort', asset, false);
-      }
-    } catch {
-      // Asset is still in Camera Roll even if album creation fails
+// Resolves the destination album exactly once. `seededAssetId` is the id of the
+// asset used to create the album (createAlbumAsync adds it implicitly) so the
+// caller can avoid adding it a second time; it's null when the album already existed.
+type AlbumResolver = (seedAsset: Asset) => Promise<{ album: Album; seededAssetId: string | null }>;
+
+// Single-flight album resolution. With CONCURRENCY workers, a naive
+// getAlbumAsync-then-createAlbumAsync check-then-act races: all workers see no
+// album and each creates one, producing duplicate "SnapsPort" albums with assets
+// split across them. Sharing one promise guarantees a single createAlbumAsync.
+function makeAlbumResolver(): AlbumResolver {
+  let pending: Promise<{ album: Album; seededAssetId: string | null }> | null = null;
+  return (seedAsset) => {
+    if (!pending) {
+      pending = (async () => {
+        const existing = await MediaLibrary.getAlbumAsync(ALBUM_NAME);
+        if (existing) return { album: existing, seededAssetId: null };
+        const created = await MediaLibrary.createAlbumAsync(ALBUM_NAME, seedAsset, false);
+        return { album: created, seededAssetId: seedAsset.id };
+      })().catch((err) => {
+        // Let a later worker retry album creation instead of poisoning the run.
+        pending = null;
+        throw err;
+      });
     }
+    return pending;
+  };
+}
+
+async function saveToLibrary(
+  localPath: string,
+  destination: ExportDestination,
+  resolveAlbum: AlbumResolver
+): Promise<void> {
+  const asset = await MediaLibrary.createAssetAsync(localPath);
+  if (destination !== 'album') return;
+
+  try {
+    const { album, seededAssetId } = await resolveAlbum(asset);
+    // Skip the asset that createAlbumAsync already added, or it'd be duplicated.
+    if (asset.id !== seededAssetId) {
+      await MediaLibrary.addAssetsToAlbumAsync([asset], album, false);
+    }
+  } catch {
+    // Asset is still in Camera Roll even if the album step fails.
   }
 }
 
@@ -55,6 +89,7 @@ export async function runDownloadQueue(
   };
 
   let cursor = 0;
+  const resolveAlbum = makeAlbumResolver();
 
   async function worker() {
     while (cursor < jobs.length) {
@@ -68,7 +103,7 @@ export async function runDownloadQueue(
       onProgress({ ...progress }, { ...job });
 
       try {
-        await saveToLibrary(job.memory.localPath, destination);
+        await saveToLibrary(job.memory.localPath, destination, resolveAlbum);
         job.status = 'saved';
         progress.saved++;
       } catch (err) {
