@@ -6,6 +6,13 @@ const RC_API_KEY_IOS = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
 // Must match the entitlement identifier you create in the RevenueCat dashboard
 const ENTITLEMENT_ID = 'unlock';
 
+// Store product ids that grant the unlock. The offering should contain exactly
+// one purchasable package, but selecting it by index is nondeterministic — a
+// stray extra package (e.g. a leftover test product, or a future tier) could sit
+// at [0]. Match the package by its product id instead. Ids differ per store:
+// the App Store product vs the RevenueCat Test Store product used in dev.
+const UNLOCK_PRODUCT_IDS = ['snapsport_unlock', 'unlock_all_test'];
+
 export function initRevenueCat() {
   if (!RC_API_KEY_IOS) {
     console.warn('RevenueCat API key not set — purchases disabled');
@@ -31,7 +38,11 @@ export type PurchaseResult =
 
 export async function purchaseUnlock(): Promise<PurchaseResult> {
   const offerings = await Purchases.getOfferings();
-  const pkg = offerings.current?.availablePackages?.[0];
+  const packages = offerings.current?.availablePackages ?? [];
+  // Prefer the package whose product is our unlock; fall back to the first only
+  // if the offering is configured with something we don't recognize.
+  const pkg =
+    packages.find((p) => UNLOCK_PRODUCT_IDS.includes(p.product.identifier)) ?? packages[0];
   if (!pkg) throw new Error('No offerings configured in RevenueCat dashboard.');
   try {
     const { customerInfo } = await Purchases.purchasePackage(pkg);
